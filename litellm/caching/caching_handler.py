@@ -810,7 +810,7 @@ class LLMCachingHandler:
                 new_kwargs["input"] = [new_kwargs["input"]]
             elif not isinstance(new_kwargs["input"], list):
                 raise ValueError("input must be a string or a list")
-            tasks: Final = []
+            tasks: Final[list[Awaitable[object]]] = []
             for idx, i in enumerate(new_kwargs["input"]):
                 preset_cache_key = litellm.cache.get_cache_key(**{**new_kwargs, "input": i})
                 tasks.append(
