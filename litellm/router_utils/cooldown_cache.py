@@ -120,11 +120,12 @@ class CooldownCache:
             )
 
             # Set the cache with a TTL equal to the cooldown time
-            self.cooldown_store.set_cache(
-                value=cooldown_data,
-                key=cooldown_key,
-                ttl=_cooldown_time,
-            )
+            with service_target(ROUTER_COOLDOWNS_TARGET):
+                self.cooldown_store.set_cache(
+                    value=cooldown_data,
+                    key=cooldown_key,
+                    ttl=_cooldown_time,
+                )
         except Exception as e:
             verbose_logger.error("CooldownCache::add_deployment_to_cooldown - Exception occurred - %s", e)
             raise e
@@ -195,7 +196,8 @@ class CooldownCache:
         # Generate the keys for the deployments
         keys: Final = [CooldownCache.get_cooldown_cache_key(model_id) for model_id in model_ids]
         # Retrieve the values for the keys using mget
-        results: Final = self.cooldown_store.batch_get_cache(keys=keys, parent_otel_span=parent_otel_span) or []
+        with service_target(ROUTER_COOLDOWNS_TARGET):
+            results: Final = self.cooldown_store.batch_get_cache(keys=keys, parent_otel_span=parent_otel_span) or []
 
         active_cooldowns: Final = []
         current_time: Final = time.time()
@@ -215,7 +217,8 @@ class CooldownCache:
         keys: Final = [f"deployment:{model_id}:cooldown" for model_id in model_ids]
 
         # Retrieve the values for the keys using mget
-        results: Final = self.cooldown_store.batch_get_cache(keys=keys, parent_otel_span=parent_otel_span) or []
+        with service_target(ROUTER_COOLDOWNS_TARGET):
+            results: Final = self.cooldown_store.batch_get_cache(keys=keys, parent_otel_span=parent_otel_span) or []
 
         min_cooldown_time: float | None = None
         # Process the results

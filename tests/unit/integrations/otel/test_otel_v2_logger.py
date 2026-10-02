@@ -3154,3 +3154,29 @@ def test_provisional_close_then_payload_close_does_not_duplicate():
     server.end()
     llm_spans = [s for s in exporter.get_finished_spans() if s.name.startswith("chat")]
     assert len(llm_spans) == 1
+
+
+def test_pipeline_op_count_lands_as_an_int_on_both_metadata_keys():
+    """A ``RedisBatch`` flush reports ``call_type=request_redis_batch`` with
+    ``event_metadata={"op_count": N}``; the span is ``redis.pipeline`` (no ``[N]`` in the
+    name) and the count survives sanitization as an int on the namespaced V2 key and the
+    bare V1 key, so a dashboard can sum it."""
+    logger, exporter = _logger()
+    parent = _service_parent(logger)
+    try:
+        asyncio.run(
+            logger.async_service_success_hook(
+                payload=_ServicePayload("redis", "request_redis_batch"),
+                parent_otel_span=parent,
+                event_metadata={"op_count": 3},
+            )
+        )
+    finally:
+        parent.end()
+    (span,) = [s for s in exporter.get_finished_spans() if s.name.startswith("redis")]
+    assert span.name == "redis.pipeline"
+    assert span.attributes[LiteLLM.SERVICE_CALL_TYPE] == "request_redis_batch"
+    v2_count = span.attributes[f"{LiteLLM.METADATA_PREFIX}op_count"]
+    v1_count = span.attributes["op_count"]
+    assert (v2_count, v1_count) == (3, 3)
+    assert type(v2_count) is int and type(v1_count) is int

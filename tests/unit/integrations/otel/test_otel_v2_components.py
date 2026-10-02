@@ -1432,7 +1432,7 @@ def test_sanitize_event_metadata_drops_objects_dumps_and_secrets():
     clean = sanitize_event_metadata(
         {
             "table_name": "combined_view",  # safe primitive -> kept
-            "count": 3,  # primitive -> kept (stringified)
+            "count": 3,  # primitive -> kept, still an int
             "function_kwargs": {"prisma_client": object()},  # denylisted key
             "function_args": (1, 2),  # denylisted key
             "user_api_key_auth": "blob",  # 'auth' substring -> dropped
@@ -1443,7 +1443,8 @@ def test_sanitize_event_metadata_drops_objects_dumps_and_secrets():
             "nested": {"x": 1},  # non-primitive value -> dropped
         }
     )
-    assert clean == {"table_name": "combined_view", "count": "3"}
+    assert clean == {"table_name": "combined_view", "count": 3}
+    assert isinstance(clean["count"], int)
 
 
 def test_sanitize_event_metadata_caps_value_length_and_handles_none():

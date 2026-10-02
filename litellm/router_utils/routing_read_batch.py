@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 
 
 ROUTER_COOLDOWNS_USAGE_TARGET: Final = "router_cooldowns_usage"
+ROUTER_USAGE_TARGET: Final = "router_usage"
 _PREFETCH_SLOT: Final = "routing_read"
 
 

@@ -324,6 +324,9 @@ class GuardrailSpanData:
         )
 
 
+MetadataScalar = str | int | float | bool
+
+
 @dataclass(frozen=True)
 class ServiceSpanData:
     service_name: str
@@ -335,7 +338,7 @@ class ServiceSpanData:
     # from ``async_service_*_hook(event_metadata=...)``. The mapper owns how
     # these are namespaced: the canonical vocabulary uses ``litellm.metadata.*``
     # keys, the semconv-ai / Traceloop vocabulary uses the bare key names.
-    event_metadata: Mapping[str, str] = field(default_factory=dict)
+    event_metadata: Mapping[str, MetadataScalar] = field(default_factory=dict)
 
     @classmethod
     def from_payload(
@@ -651,17 +654,18 @@ _MAX_METADATA_ITEMS: Final = 32
 
 def sanitize_event_metadata(
     event_metadata: Mapping[str, object] | None,
-) -> dict[str, str]:
-    """Reduce caller-supplied ``event_metadata`` to span-safe string attributes.
+) -> dict[str, MetadataScalar]:
+    """Reduce caller-supplied ``event_metadata`` to span-safe primitive attributes.
 
-    Keeps only primitive values (str/int/float/bool) under non-sensitive keys —
-    never ``repr()``-ing objects, dicts, or lists, never stamping secrets/headers,
-    and bounding the count and per-value length. This is the single chokepoint:
-    both the GenAI and legacy mappers read the cleaned result.
+    Keeps only primitive values (str/int/float/bool, each in its own type so a
+    count stays a number) under non-sensitive keys — never ``repr()``-ing objects,
+    dicts, or lists, never stamping secrets/headers, and bounding the count and
+    per-string length. This is the single chokepoint: both the GenAI and legacy
+    mappers read the cleaned result.
     """
     if not event_metadata:
         return {}
-    clean: Final[dict[str, str]] = {}
+    clean: Final[dict[str, MetadataScalar]] = {}
     for key, value in event_metadata.items():
         if len(clean) >= _MAX_METADATA_ITEMS:
             break
@@ -672,8 +676,10 @@ def sanitize_event_metadata(
             continue
         # ``bool`` is a subclass of ``int``, so it's covered. Non-primitive values
         # (objects, dicts, lists) are dropped rather than stringified.
-        if isinstance(value, (str, int, float)):
-            clean[key] = str(value)[:_MAX_METADATA_VALUE_LEN]
+        if isinstance(value, str):
+            clean[key] = value[:_MAX_METADATA_VALUE_LEN]
+        elif isinstance(value, (int, float)):
+            clean[key] = value
     return clean
 
 

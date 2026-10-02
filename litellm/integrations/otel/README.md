@@ -64,13 +64,22 @@ Redis spans are named `"{service}.{verb} {target}"` (e.g. `"redis.get llm_respon
 database conventions: the verb comes from the cache method
 (`spans._SERVICE_VERB_BY_CALL_TYPE`), the target from the producer running the
 call inside `litellm._internal_context.service_target(...)` and is a key family
-(`llm_response`, `auth_objects`, `router_cooldowns`, `prompt_cache_pins`,
-`spend_counters`), never a key. The whole `auth` phase runs under `auth_objects`,
-so every cache read it triggers is `redis.get auth_objects` / `redis.mget auth_objects`.
-A call with no declared target is just `"redis.get"`; a per-request pipeline that
-carries several owners' ops is `"redis.pipeline"` with its op count on
-`litellm.metadata.op_count`. Postgres helpers keep the `"{service} {call_type}"`
-name (`"postgres get_data"`) until they get `db.select {table}` names. Either way
+(`llm_response`, `auth_objects`, `router_cooldowns`, `router_cooldowns_usage`,
+`router_usage`, `prompt_cache_pins`, `spend_counters`, `config_params`,
+`daily_report_schedule`), never a key. The whole `auth` phase runs under
+`auth_objects`, so every cache read it triggers is `redis.get auth_objects` /
+`redis.mget auth_objects`, and so does the post-call spend write-back into the
+same auth objects. The verb is the Redis command the method issues (`get`, `mget`,
+`set`, `sadd`, `incr`, `ttl`, `expire`, `delete`, `rpush`, `lpop`, `scan`, `ping`),
+so the cooldown fail counter shows as `redis.incr router_cooldowns` followed by
+`redis.ttl router_cooldowns` / `redis.expire router_cooldowns`. A call with no
+declared target is just `"redis.get"`; a per-request pipeline that carries several
+owners' ops is `"redis.pipeline"` with its op count on `litellm.metadata.op_count`
+(an int, never stringified). Postgres helpers keep the `"{service} {call_type}"`
+name (`"postgres get_data"`) until they get `db.select {table}` names, as does
+every other non-Redis service (`"batch_write_to_db _PROXY_track_cost_callback"`):
+one scheme, `{service}.{verb} {target}` when the method maps to a verb and
+`{service} {call_type}` otherwise, and never a count, key or id in the name. Either way
 the raw method name stays on `litellm.service.call_type` and `db.operation.name`
 (and the bare `call_type` the metrics are keyed by), the target lands on
 `litellm.service.target`, and the litellm call chain that issued the call
