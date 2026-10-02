@@ -1518,6 +1518,10 @@ class ProxyExtrasDBManager:
                                     f"Error: {stderr}"
                                 )
                                 raise
+                        else:
+                            logger.error(
+                                f"prisma migrate deploy failed with an error the resolver does not handle: {stderr}"
+                            )
                 else:
                     if ProxyExtrasDBManager.spend_logs_is_partitioned():
                         raise RuntimeError(PARTITIONED_SPEND_LOGS_PUSH_ERROR)
@@ -1532,7 +1536,7 @@ class ProxyExtrasDBManager:
                     )
                     return True
             except subprocess.TimeoutExpired:
-                logger.warning(
+                logger.error(
                     "Attempt %s timed out. Raise %s if this database needs longer to apply its schema.",
                     attempt + 1,
                     PRISMA_MIGRATE_DEPLOY_TIMEOUT_ENV_VAR if use_migrate else PRISMA_COMMAND_TIMEOUT_ENV_VAR,
@@ -1545,7 +1549,8 @@ class ProxyExtrasDBManager:
                     if attempts_left > 0
                     else ""
                 )
-                logger.info(f"The process failed to execute. Details: {e}.{retry_msg}")
+                stderr_detail: Final = f" stderr: {e.stderr}" if e.stderr else ""
+                logger.error(f"The process failed to execute. Details: {e}.{stderr_detail}{retry_msg}")
                 time.sleep(random.randrange(5, 15))
             finally:
                 os.chdir(original_dir)
